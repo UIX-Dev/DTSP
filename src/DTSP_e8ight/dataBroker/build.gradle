@@ -87,12 +87,7 @@ tasks.named('test') {
 
 repositories {
     maven {
-        url 'http://172.16.28.217:9081/repository/maven-releases/'
-        allowInsecureProtocol = true
-        credentials {
-            username = "admin"
-            password = "ndxpro123!"
-        }
+        url "file:///tmp/local-maven-repo"
     }
 }
 

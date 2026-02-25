@@ -33,8 +33,12 @@ public class ContextCacheService {
         this.objectMapper = objectMapper;
     }
 
-    @Cacheable(key = "#contextURI", value = "context")
+    @Cacheable(key = "#contextURI", value = "context", condition = "#contextURI != null")
     public Map<String, String> getDataModelsInContext(String contextURI) {
+        if(contextURI == null || contextURI.isEmpty()) {
+            log.warn("contextURI is null or empty, returning empty data models map");
+            return new HashMap<>();
+        }
         String responsePayload = requestHTTPContext(contextURI);
         if(ValidateUtil.isEmptyData(responsePayload))
             throw new DataBrokerException(ErrorCode.INVALID_REQUEST, "Retrieve @context error. contextURI=" + contextURI);
@@ -78,6 +82,10 @@ public class ContextCacheService {
     }
 
     public String requestHTTPContext(String contextURI) {
+        if(contextURI == null || contextURI.isEmpty()) {
+            log.warn("requestHTTPContext: contextURI is null or empty");
+            return null;
+        }
         MultiValueMap<String, String> headerMap = new LinkedMultiValueMap<>();
         headerMap.set(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
         headerMap.set(HttpHeaders.ACCEPT, MediaType.ALL_VALUE);

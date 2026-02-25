@@ -38,8 +38,9 @@ public class EntityValidationService {
         String parsedDataModelId = getDataModelId(entityId);
 
         String entityContext = entity.getContext();
-        if(entityContext == null || entityContext.equals(""))
-            throw new DataBrokerException(ErrorCode.BAD_REQUEST_DATA, "Invalid @context value.");
+        if(entityContext == null || entityContext.equals("")) {
+            log.warn("Entity @context is null or empty for entity={}, skipping context validation", entityId);
+        }
 
         // DB dataModelResponseDto 조회 및 entity context 유효성 검사
         DataModelResponseDto dataModel = dataModelCacheService.getDataModel(parsedDataModelId);
