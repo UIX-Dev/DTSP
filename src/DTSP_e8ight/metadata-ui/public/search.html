@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>디지털 트윈 메타데이터 검색</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1><span class="icon">🔍</span> 디지털 트윈 메타데이터 검색</h1>
+      <div class="subtitle">Digital Twin Metadata Search</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span class="badge badge-success" id="statusBadge">● 연결됨</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-icon blue">📦</div>
+        <div>
+          <div class="stat-value" id="statTotal">-</div>
+          <div class="stat-label">전체 데이터 모델</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div>
+          <div class="stat-value" id="statReady">-</div>
+          <div class="stat-label">준비 완료</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">📋</div>
+        <div>
+          <div class="stat-value" id="statAttributes">-</div>
+          <div class="stat-label">등록된 속성</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="모델명 또는 키워드 검색..." />
+      </div>
+      <select id="filterReady">
+        <option value="">전체 상태</option>
+        <option value="true">✅ 준비 완료</option>
+        <option value="false">⏳ 준비 중</option>
+      </select>
+      <select id="pageSize">
+        <option value="10">10개씩</option>
+        <option value="25" selected>25개씩</option>
+        <option value="50">50개씩</option>
+      </select>
+      <button class="btn btn-primary" onclick="loadData()">🔍 검색</button>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th>모델 ID</th>
+              <th>타입</th>
+              <th>버전</th>
+              <th>제목</th>
+              <th>설명</th>
+              <th>상태</th>
+              <th>생성일</th>
+              <th style="width:80px">상세</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <tr><td colspan="9"><div class="loading"><div class="spinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <div class="pagination-info" id="paginationInfo">-</div>
+        <div class="pagination-controls" id="paginationControls"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal" style="max-width:800px">
+      <div class="modal-header">
+        <h3 id="modalTitle">데이터 모델 상세</h3>
+        <button class="modal-close" onclick="closeModal('detailModal')">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('detailModal')">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let currentPage = 0;
+    let totalPages = 0;
+
+    // ── Load data ──
+    async function loadData() {
+      const word = document.getElementById('searchInput').value.trim();
+      const isReady = document.getElementById('filterReady').value;
+      const size = parseInt(document.getElementById('pageSize').value);
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '<tr><td colspan="9"><div class="loading"><div class="spinner"></div></div></td></tr>';
+
+      try {
+        const result = await api.getDataModels({ curPage: currentPage, size, word, isReady });
+        totalPages = result.totalPage || 0;
+        const total = result.totalData || 0;
+        const items = result.data || [];
+
+        document.getElementById('statTotal').textContent = total;
+
+        if (items.length === 0) {
+          tbody.innerHTML = `
+            <tr><td colspan="9">
+              <div class="empty-state">
+                <div class="icon">📭</div>
+                <h3>데이터 모델이 없습니다</h3>
+                <p>검색 조건을 변경하거나, 메타데이터 등록 페이지에서 새 모델을 생성하세요.</p>
+              </div>
+            </td></tr>`;
+          document.getElementById('paginationInfo').textContent = '0개 결과';
+          document.getElementById('paginationControls').innerHTML = '';
+          return;
+        }
+
+        // Fetch full details for each model
+        const details = await Promise.allSettled(
+          items.map(id => api.getDataModel(id))
+        );
+
+        let readyCount = 0;
+        tbody.innerHTML = details.map((d, i) => {
+          if (d.status === 'rejected') {
+            return `<tr>
+              <td>${currentPage * size + i + 1}</td>
+              <td><strong>${items[i]}</strong></td>
+              <td colspan="7" style="color:var(--text-muted)">상세 정보 로드 실패</td>
+            </tr>`;
+          }
+          const m = d.value;
+          if (m.isReady) readyCount++;
+          return `<tr onclick="showDetail('${m.id}')" style="cursor:pointer">
+            <td>${currentPage * size + i + 1}</td>
+            <td><strong>${m.id || '-'}</strong></td>
+            <td>${m.type || '-'}</td>
+            <td>${m.version || '-'}</td>
+            <td>${truncate(m.title, 30)}</td>
+            <td style="color:var(--text-secondary)">${truncate(m.description, 40)}</td>
+            <td>${m.isReady
+              ? '<span class="badge badge-success">준비 완료</span>'
+              : '<span class="badge badge-warning">준비 중</span>'}</td>
+            <td style="font-size:13px;color:var(--text-secondary)">${formatDate(m.createdAt)}</td>
+            <td><button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();showDetail('${m.id}')">보기</button></td>
+          </tr>`;
+        }).join('');
+
+        document.getElementById('statReady').textContent = readyCount;
+
+        // Pagination info
+        const start = currentPage * size + 1;
+        const end = Math.min(start + items.length - 1, total);
+        document.getElementById('paginationInfo').textContent = `${start}-${end} / ${total}개 결과`;
+        renderPagination();
+
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML = `<tr><td colspan="9">
+          <div class="empty-state">
+            <div class="icon">⚠️</div>
+            <h3>서버 연결 오류</h3>
+            <p>${err.message}</p>
+          </div>
+        </td></tr>`;
+        document.getElementById('statusBadge').textContent = '● 연결 실패';
+        document.getElementById('statusBadge').className = 'badge badge-danger';
+      }
+    }
+
+    // ── Pagination ──
+    function renderPagination() {
+      const controls = document.getElementById('paginationControls');
+      if (totalPages <= 1) { controls.innerHTML = ''; return; }
+
+      let html = `<button ${currentPage === 0 ? 'disabled' : ''} onclick="goPage(${currentPage - 1})">◀ 이전</button>`;
+      const startPage = Math.max(0, currentPage - 2);
+      const endPage = Math.min(totalPages - 1, startPage + 4);
+      for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i + 1}</button>`;
+      }
+      html += `<button ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="goPage(${currentPage + 1})">다음 ▶</button>`;
+      controls.innerHTML = html;
+    }
+
+    function goPage(page) {
+      currentPage = page;
+      loadData();
+    }
+
+    // ── Detail Modal ──
+    async function showDetail(id) {
+      openModal('detailModal');
+      document.getElementById('modalTitle').textContent = `📦 ${id}`;
+      document.getElementById('modalBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+      try {
+        const m = await api.getDataModel(id);
+        document.getElementById('modalBody').innerHTML = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+            <div class="form-group">
+              <label>모델 ID</label>
+              <div style="padding:8px 0;font-weight:600">${m.id}</div>
+            </div>
+            <div class="form-group">
+              <label>타입</label>
+              <div style="padding:8px 0">${m.type || '-'}</div>
+            </div>
+            <div class="form-group">
+              <label>버전</label>
+              <div style="padding:8px 0">${m.version || '-'}</div>
+            </div>
+            <div class="form-group">
+              <label>상태</label>
+              <div style="padding:8px 0">${m.isReady
+                ? '<span class="badge badge-success">준비 완료</span>'
+                : '<span class="badge badge-warning">준비 중</span>'}</div>
+            </div>
+            <div class="form-group">
+              <label>제목</label>
+              <div style="padding:8px 0">${m.title || '-'}</div>
+            </div>
+            <div class="form-group">
+              <label>동적 여부</label>
+              <div style="padding:8px 0">${m.isDynamic ? '예' : '아니오'}</div>
+            </div>
+            <div class="form-group" style="grid-column:span 2">
+              <label>설명</label>
+              <div style="padding:8px 0">${m.description || '-'}</div>
+            </div>
+            <div class="form-group">
+              <label>생성일</label>
+              <div style="padding:8px 0;font-size:13px">${formatDate(m.createdAt)}</div>
+            </div>
+            <div class="form-group">
+              <label>수정일</label>
+              <div style="padding:8px 0;font-size:13px">${formatDate(m.modifiedAt)}</div>
+            </div>
+          </div>
+
+          ${m.required && m.required.length > 0 ? `
+          <div class="form-group">
+            <label>필수 속성 (Required)</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 0">
+              ${m.required.map(r => `<span class="badge badge-info">${r}</span>`).join('')}
+            </div>
+          </div>` : ''}
+
+          ${m.attributeNames ? `
+          <div class="form-group">
+            <label>속성 목록</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 0">
+              ${Object.keys(m.attributeNames).map(a => `<span class="badge badge-neutral">${a}</span>`).join('')}
+            </div>
+          </div>` : ''}
+
+          ${m.attributes ? `
+          <div class="form-group">
+            <label>전체 속성 데이터 (JSON)</label>
+            <div class="json-viewer">${JSON.stringify(m.attributes, null, 2)}</div>
+          </div>` : ''}
+        `;
+      } catch (err) {
+        document.getElementById('modalBody').innerHTML = `
+          <div class="empty-state">
+            <div class="icon">⚠️</div>
+            <h3>로드 실패</h3>
+            <p>${err.message}</p>
+          </div>`;
+      }
+    }
+
+    // ── Load attribute stats ──
+    async function loadStats() {
+      try {
+        const attrs = await api.getAttributes({ curPage: 0, size: 1 });
+        document.getElementById('statAttributes').textContent = attrs.totalData || 0;
+      } catch (e) {
+        document.getElementById('statAttributes').textContent = '-';
+      }
+    }
+
+    // ── Event listeners ──
+    document.getElementById('searchInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { currentPage = 0; loadData(); }
+    });
+    document.getElementById('filterReady').addEventListener('change', () => { currentPage = 0; loadData(); });
+    document.getElementById('pageSize').addEventListener('change', () => { currentPage = 0; loadData(); });
+
+    // ── Init ──
+    loadData();
+    loadStats();
+  </script>
+</body>
+</html>

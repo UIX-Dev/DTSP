@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제주시 공기질 API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #3b4151;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #173647, #2c5f7c);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 13px;
+            opacity: 0.85;
+            margin-top: 4px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .status-badge {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.online {
+            background: #69f0ae;
+        }
+
+        .status-dot.offline {
+            background: #ff5252;
+        }
+
+        .status-dot.checking {
+            background: #ffd740;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .info-bar {
+            background: #ffefc6;
+            border-left: 4px solid #f0ad4e;
+            padding: 12px 30px;
+            font-size: 13px;
+            color: #665000;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-bar.error {
+            background: #fde8e8;
+            border-color: #e53935;
+            color: #c62828;
+        }
+
+        .info-bar.success {
+            background: #e8f5e9;
+            border-color: #43a047;
+            color: #2e7d32;
+        }
+
+        .main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 30px;
+        }
+
+        .section-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid #e8e8e8;
+            cursor: pointer;
+        }
+
+        .section-header h2 {
+            font-size: 16px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-body {
+            padding: 0;
+        }
+
+        /* API Endpoints */
+        .endpoint {
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .endpoint:last-child {
+            border-bottom: none;
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 24px;
+            cursor: pointer;
+            gap: 12px;
+        }
+
+        .endpoint-header:hover {
+            background: #fafafa;
+        }
+
+        .method-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            min-width: 60px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .method-badge.get {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .method-badge.post {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .method-badge.put {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .method-badge.delete {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .endpoint-path {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            color: #333;
+            flex: 1;
+        }
+
+        .endpoint-desc {
+            font-size: 13px;
+            color: #888;
+        }
+
+        .endpoint-detail {
+            display: none;
+            padding: 16px 24px;
+            background: #fafafa;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .endpoint-detail.open {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 16px;
+        }
+
+        .detail-section h4 {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .param-table th {
+            text-align: left;
+            padding: 8px 12px;
+            background: #f0f0f0;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .param-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .param-required {
+            color: #e53935;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .param-type {
+            font-family: monospace;
+            color: #1565c0;
+            font-size: 12px;
+        }
+
+        .response-code {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .response-code.r200 {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .response-code.r400 {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .response-code.r404 {
+            background: #fafafa;
+            color: #666;
+        }
+
+        .response-code.r500 {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .code-block {
+            background: #263238;
+            color: #eeffff;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Consolas', monaco, monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            line-height: 1.6;
+            white-space: pre;
+        }
+
+        .try-btn {
+            padding: 6px 16px;
+            border: 1px solid #3949ab;
+            background: white;
+            color: #3949ab;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .try-btn:hover {
+            background: #e8eaf6;
+        }
+
+        .tag {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: #e8eaf6;
+            color: #3949ab;
+            font-weight: 600;
+        }
+
+        .base-url-box {
+            background: #263238;
+            color: #a5d6a7;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 16px 24px;
+        }
+
+        .chevron {
+            transition: transform 0.2s;
+            font-size: 12px;
+            color: #999;
+        }
+
+        .chevron.open {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div>
+            <h1>🌊 제주시 공기질 API</h1>
+            <p>Jeju City Air Quality API Documentation — Swagger UI</p>
+        </div>
+        <div class="header-right">
+            <div class="status-badge">
+                <span class="status-dot offline" id="statusDot"></span>
+                <span id="statusText">외부 서버 오프라인</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-bar error" id="infoBar">
+        ⚠️ 원본 Swagger UI 서버 (dev.jinwoosi.co.kr:8083)에 연결할 수 없습니다. 아래 API 문서는 로컬 캐시 버전입니다.
+    </div>
+
+    <div class="main">
+        <div class="base-url-box">
+            Base URL: <strong>http://dev.jinwoosi.co.kr:8083</strong>
+        </div>
+
+        <!-- AirQuality Controller -->
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>
+                    <span class="tag">AirQuality</span>
+                    공기질 데이터 API
+                </h2>
+                <span class="chevron">▶</span>
+            </div>
+            <div class="section-body" style="display:none;">
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge get">GET</span>
+                        <span class="endpoint-path">/api/airquality</span>
+                        <span class="endpoint-desc">전체 공기질 데이터 조회</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Parameters</h4>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td>page</td>
+                                    <td><span class="param-type">integer</span></td>
+                                    <td></td>
+                                    <td>페이지 번호 (기본값: 0)</td>
+                                </tr>
+                                <tr>
+                                    <td>size</td>
+                                    <td><span class="param-type">integer</span></td>
+                                    <td></td>
+                                    <td>페이지 크기 (기본값: 20)</td>
+                                </tr>
+                                <tr>
+                                    <td>stationId</td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td></td>
+                                    <td>측정소 ID</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">200</span> 성공<br><br>
+                            <div class="code-block">{
+                                "content": [
+                                {
+                                "id": 1,
+                                "stationId": "JEJU-001",
+                                "pm10": 35,
+                                "pm25": 18,
+                                "o3": 0.045,
+                                "no2": 0.023,
+                                "co": 0.5,
+                                "so2": 0.003,
+                                "measuredAt": "2026-02-28T09:00:00"
+                                }
+                                ],
+                                "totalElements": 150,
+                                "totalPages": 8
+                                }</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge get">GET</span>
+                        <span class="endpoint-path">/api/airquality/{id}</span>
+                        <span class="endpoint-desc">특정 공기질 데이터 조회</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Parameters</h4>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td>id</td>
+                                    <td><span class="param-type">integer</span></td>
+                                    <td><span class="param-required">required</span></td>
+                                    <td>공기질 데이터 ID</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">200</span> 성공
+                            <span class="response-code r404">404</span> Not Found
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge get">GET</span>
+                        <span class="endpoint-path">/api/airquality/station/{stationId}</span>
+                        <span class="endpoint-desc">측정소별 공기질 데이터 조회</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Parameters</h4>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td>stationId</td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td><span class="param-required">required</span></td>
+                                    <td>측정소 ID (예: JEJU-001)</td>
+                                </tr>
+                                <tr>
+                                    <td>from</td>
+                                    <td><span class="param-type">datetime</span></td>
+                                    <td></td>
+                                    <td>시작 시간 (ISO 8601)</td>
+                                </tr>
+                                <tr>
+                                    <td>to</td>
+                                    <td><span class="param-type">datetime</span></td>
+                                    <td></td>
+                                    <td>종료 시간 (ISO 8601)</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">200</span> 성공
+                            <span class="response-code r400">400</span> Bad Request
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge get">GET</span>
+                        <span class="endpoint-path">/api/airquality/latest</span>
+                        <span class="endpoint-desc">최신 공기질 데이터 조회</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Parameters</h4>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td>stationId</td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td></td>
+                                    <td>측정소 ID (없으면 전체 측정소)</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">200</span> 성공
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge get">GET</span>
+                        <span class="endpoint-path">/api/airquality/statistics</span>
+                        <span class="endpoint-desc">공기질 통계 데이터</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Parameters</h4>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td>period</td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td></td>
+                                    <td>통계 기간 (daily, weekly, monthly)</td>
+                                </tr>
+                                <tr>
+                                    <td>stationId</td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td></td>
+                                    <td>측정소 ID</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">200</span> 성공
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Station Controller -->
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>
+                    <span class="tag">Station</span>
+                    측정소 관리 API
+                </h2>
+                <span class="chevron">▶</span>
+            </div>
+            <div class="section-body" style="display:none;">
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge get">GET</span>
+                        <span class="endpoint-path">/api/stations</span>
+                        <span class="endpoint-desc">전체 측정소 목록 조회</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">200</span> 성공<br><br>
+                            <div class="code-block">[
+                                {
+                                "stationId": "JEJU-001",
+                                "stationName": "제주시청",
+                                "address": "제주특별자치도 제주시 이도이동",
+                                "latitude": 33.4996,
+                                "longitude": 126.5312,
+                                "status": "ACTIVE"
+                                }
+                                ]</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge get">GET</span>
+                        <span class="endpoint-path">/api/stations/{stationId}</span>
+                        <span class="endpoint-desc">특정 측정소 상세 정보</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Parameters</h4>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td>stationId</td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td><span class="param-required">required</span></td>
+                                    <td>측정소 ID</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">200</span> 성공
+                            <span class="response-code r404">404</span> Not Found
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge post">POST</span>
+                        <span class="endpoint-path">/api/stations</span>
+                        <span class="endpoint-desc">새 측정소 등록</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">{
+                                "stationId": "JEJU-NEW",
+                                "stationName": "새 측정소",
+                                "address": "제주특별자치도 제주시...",
+                                "latitude": 33.5000,
+                                "longitude": 126.5300
+                                }</div>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">201</span> Created
+                            <span class="response-code r400">400</span> Bad Request
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Controller -->
+        <div class="section-card">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>
+                    <span class="tag">Alert</span>
+                    공기질 경보 API
+                </h2>
+                <span class="chevron">▶</span>
+            </div>
+            <div class="section-body" style="display:none;">
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge get">GET</span>
+                        <span class="endpoint-path">/api/alerts</span>
+                        <span class="endpoint-desc">공기질 경보 목록 조회</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Parameters</h4>
+                            <table class="param-table">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                                <tr>
+                                    <td>level</td>
+                                    <td><span class="param-type">string</span></td>
+                                    <td></td>
+                                    <td>경보 수준 (GOOD, MODERATE, UNHEALTHY, HAZARDOUS)</td>
+                                </tr>
+                                <tr>
+                                    <td>active</td>
+                                    <td><span class="param-type">boolean</span></td>
+                                    <td></td>
+                                    <td>활성 경보만 조회</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">200</span> 성공<br><br>
+                            <div class="code-block">[
+                                {
+                                "id": 1,
+                                "stationId": "JEJU-001",
+                                "level": "UNHEALTHY",
+                                "pollutant": "PM10",
+                                "value": 85,
+                                "threshold": 80,
+                                "issuedAt": "2026-02-28T08:30:00",
+                                "active": true
+                                }
+                                ]</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method-badge post">POST</span>
+                        <span class="endpoint-path">/api/alerts/subscribe</span>
+                        <span class="endpoint-desc">경보 알림 구독</span>
+                        <span class="chevron">▶</span>
+                    </div>
+                    <div class="endpoint-detail">
+                        <div class="detail-section">
+                            <h4>Request Body</h4>
+                            <div class="code-block">{
+                                "stationId": "JEJU-001",
+                                "pollutants": ["PM10", "PM25"],
+                                "threshold": "MODERATE",
+                                "notifyEmail": "user@example.com"
+                                }</div>
+                        </div>
+                        <div class="detail-section">
+                            <h4>Responses</h4>
+                            <span class="response-code r200">201</span> Created
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSection(header) {
+            const body = header.nextElementSibling;
+            const chevron = header.querySelector('.chevron');
+            if (body.style.display === 'none') {
+                body.style.display = 'block';
+                chevron.classList.add('open');
+            } else {
+                body.style.display = 'none';
+                chevron.classList.remove('open');
+            }
+        }
+
+        function toggleEndpoint(header) {
+            const detail = header.nextElementSibling;
+            const chevron = header.querySelector('.chevron');
+            detail.classList.toggle('open');
+            chevron.classList.toggle('open');
+        }
+
+        // Check if original server is accessible
+        async function checkOriginalServer() {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            const info = document.getElementById('infoBar');
+            try {
+                const controller = new AbortController();
+                setTimeout(() => controller.abort(), 5000);
+                const resp = await fetch('http://dev.jinwoosi.co.kr:8083/swagger-ui/index.html', {
+                    signal: controller.signal,
+                    mode: 'no-cors'
+                });
+                dot.className = 'status-dot online';
+                text.textContent = '서버 연결됨';
+                info.className = 'info-bar success';
+                info.innerHTML = '✅ 원본 Swagger UI 서버에 연결 가능합니다.';
+            } catch (e) {
+                dot.className = 'status-dot offline';
+                text.textContent = '외부 서버 오프라인';
+            }
+        }
+        checkOriginalServer();
+
+        // Auto-expand first section
+        document.querySelector('.section-header').click();
+    </script>
+</body>
+
+</html>

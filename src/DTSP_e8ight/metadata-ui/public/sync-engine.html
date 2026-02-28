@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>연합 객체 및 동기화 엔진 관리</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .sync-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .sync-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+            padding: 20px 24px;
+            transition: var(--transition);
+            cursor: default;
+        }
+
+        .sync-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary);
+        }
+
+        .sync-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .sync-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sync-card-id {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        .sync-card-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .sync-field {
+            font-size: 13px;
+        }
+
+        .sync-field-label {
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .sync-field-value {
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .sync-card-footer {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-dot {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .status-dot::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.active::before {
+            background: var(--success);
+        }
+
+        .status-dot.inactive::before {
+            background: var(--text-muted);
+        }
+
+        .status-dot.syncing::before {
+            background: var(--warning);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .progress-bar-wrapper {
+            width: 100%;
+            height: 6px;
+            background: var(--border-light);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--primary), #8b5cf6);
+            transition: width 0.5s ease;
+        }
+
+        .entity-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .entity-tag {
+            padding: 3px 10px;
+            background: var(--primary-alpha);
+            color: var(--primary);
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 24px 0 8px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-banner {
+            background: linear-gradient(135deg, #eef1ff 0%, #f0f4ff 100%);
+            border: 1px solid rgba(74, 108, 247, 0.15);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .info-banner .icon {
+            font-size: 20px;
+            margin-top: 2px;
+        }
+
+        .info-banner .text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .info-banner .text strong {
+            color: var(--text);
+        }
+
+        .api-endpoint {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #1e1e2e;
+            border-radius: var(--radius-sm);
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 13px;
+            color: #cdd6f4;
+            margin-top: 6px;
+        }
+
+        .api-method {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .api-method.get {
+            background: rgba(56, 161, 105, 0.2);
+            color: #38a169;
+        }
+
+        .api-method.post {
+            background: rgba(74, 108, 247, 0.2);
+            color: #4a6cf7;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="page-header" style="background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);">
+        <div>
+            <h1><span class="icon">🔄</span> 연합 객체 및 동기화 엔진 관리</h1>
+            <div class="subtitle">Union Object Sync Engine Management</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge badge-success" id="statusBadge">● 연결됨</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Info Banner -->
+        <div class="info-banner">
+            <div class="icon">ℹ️</div>
+            <div class="text">
+                <strong>연합 객체 동기화 엔진</strong>은 분산 시스템 간 디지털 트윈 객체의 동기화를 관리합니다.
+                FDT Service API (<code>localhost:50038</code>)를 통해 연합 트윈 데이터를 조회하고 관리할 수 있습니다.
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-icon blue">🔗</div>
+                <div>
+                    <div class="stat-value" id="statEndpoints">-</div>
+                    <div class="stat-label">API 엔드포인트</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">✅</div>
+                <div>
+                    <div class="stat-value" id="statStatus">-</div>
+                    <div class="stat-label">서비스 상태</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange">📊</div>
+                <div>
+                    <div class="stat-value" id="statObjects">-</div>
+                    <div class="stat-label">연합 객체</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="연합 객체 ID 검색..." />
+            </div>
+            <button class="btn btn-primary" onclick="queryFdtData()">🔍 조회</button>
+            <button class="btn btn-secondary" onclick="loadServiceInfo()">🔄 새로고침</button>
+        </div>
+
+        <!-- FDT Query Section -->
+        <div class="section-title">📡 연합 트윈 데이터 조회</div>
+        <div class="card">
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Federated Digital Object ID *</label>
+                        <input type="text" id="fdtObjectId" placeholder="예: urn:fdt:twin:object:001" />
+                    </div>
+                    <div class="form-group">
+                        <label>Secret Key *</label>
+                        <input type="text" id="fdtSecretKey" placeholder="API 인증 키" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Measure Position ID (선택)</label>
+                    <input type="text" id="fdtMeasureId" placeholder="측정 위치 ID (선택사항)" />
+                </div>
+                <div style="display:flex;gap:8px;margin-top:4px;">
+                    <button class="btn btn-primary" onclick="queryFdtTourData()">📊 데이터 조회</button>
+                    <button class="btn btn-secondary" onclick="clearForm()">🗑️ 초기화</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Query Result -->
+        <div id="queryResult" style="display:none; margin-top:16px;">
+            <div class="section-title">📋 조회 결과</div>
+            <div class="card">
+                <div class="card-body">
+                    <div class="json-viewer" id="resultJson" style="max-height:400px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service API Info -->
+        <div class="section-title">🔌 FDT Service API 엔드포인트</div>
+        <div class="card">
+            <div class="card-body" id="apiEndpoints">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sync Engine Status Cards -->
+        <div class="section-title">⚙️ 동기화 엔진 상태</div>
+        <div class="sync-grid" id="syncGrid">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script>
+        const FDT_API_BASE = '/api/fdt';
+
+        // ── Load Service Info ──
+        async function loadServiceInfo() {
+            try {
+                // Check health
+                const healthRes = await fetch(FDT_API_BASE + '/health');
+                const healthOk = healthRes.ok;
+
+                document.getElementById('statStatus').textContent = healthOk ? '정상' : '오류';
+                document.getElementById('statusBadge').textContent = healthOk ? '● 연결됨' : '● 연결 실패';
+                document.getElementById('statusBadge').className = healthOk ? 'badge badge-success' : 'badge badge-danger';
+
+                // Load API docs
+                const docsRes = await fetch(FDT_API_BASE + '/api-docs');
+                if (docsRes.ok) {
+                    const docs = await docsRes.json();
+                    const paths = Object.keys(docs.paths || {});
+                    document.getElementById('statEndpoints').textContent = paths.length;
+
+                    // Render API endpoints
+                    const endpointsHtml = paths.map(path => {
+                        const methods = docs.paths[path];
+                        return Object.keys(methods).map(method => {
+                            const info = methods[method];
+                            return `
+                <div style="margin-bottom:12px;">
+                  <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${info.tags ? info.tags[0] : ''}</div>
+                  <div class="api-endpoint">
+                    <span class="api-method ${method}">${method}</span>
+                    <span>${path}</span>
+                  </div>
+                  ${info.parameters ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">파라미터: ${info.parameters.map(p => p.name + (p.required ? ' *' : '')).join(', ')}</div>` : ''}
+                </div>
+              `;
+                        }).join('');
+                    }).join('');
+                    document.getElementById('apiEndpoints').innerHTML = endpointsHtml || '<div class="empty-state"><div class="icon">📭</div><h3>API 문서 없음</h3></div>';
+                }
+            } catch (err) {
+                console.error('Service info error:', err);
+                document.getElementById('statStatus').textContent = '오류';
+                document.getElementById('statusBadge').textContent = '● 연결 실패';
+                document.getElementById('statusBadge').className = 'badge badge-danger';
+            }
+
+            // Load sync engine demo cards
+            loadSyncEngineCards();
+        }
+
+        // ── Query FDT Tour Data ──
+        async function queryFdtTourData() {
+            const objectId = document.getElementById('fdtObjectId').value.trim();
+            const secretKey = document.getElementById('fdtSecretKey').value.trim();
+            const measureId = document.getElementById('fdtMeasureId').value.trim();
+
+            if (!objectId || !secretKey) {
+                showToast('Federated Digital Object ID와 Secret Key는 필수입니다.', 'error');
+                return;
+            }
+
+            try {
+                const params = new URLSearchParams({
+                    federated_digital_object_id: objectId,
+                    secret_key: secretKey,
+                });
+                if (measureId) params.set('measure_position_id', measureId);
+
+                const res = await fetch(`${FDT_API_BASE}/tour/load?${params}`);
+                const resultDiv = document.getElementById('queryResult');
+                const resultJson = document.getElementById('resultJson');
+
+                if (res.ok) {
+                    const data = await res.json();
+                    resultJson.textContent = JSON.stringify(data, null, 2);
+                    resultDiv.style.display = 'block';
+                    document.getElementById('statObjects').textContent = Array.isArray(data) ? data.length : 1;
+                    showToast('데이터 조회 성공!', 'success');
+                } else {
+                    const errText = await res.text();
+                    resultJson.textContent = `Error ${res.status}: ${errText}`;
+                    resultDiv.style.display = 'block';
+                    showToast(`조회 실패: ${res.status}`, 'error');
+                }
+            } catch (err) {
+                showToast(`연결 오류: ${err.message}`, 'error');
+            }
+        }
+
+        // ── Search from toolbar ──
+        function queryFdtData() {
+            const searchVal = document.getElementById('searchInput').value.trim();
+            if (searchVal) {
+                document.getElementById('fdtObjectId').value = searchVal;
+                showToast('검색어가 Object ID 필드에 입력되었습니다. Secret Key를 입력 후 조회하세요.', 'info');
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('fdtObjectId').value = '';
+            document.getElementById('fdtSecretKey').value = '';
+            document.getElementById('fdtMeasureId').value = '';
+            document.getElementById('queryResult').style.display = 'none';
+        }
+
+        // ── Sync Engine Status Cards ──
+        function loadSyncEngineCards() {
+            const engines = [
+                {
+                    name: '디지털 트윈 객체 동기화',
+                    id: 'sync-dt-objects',
+                    status: 'active',
+                    type: '실시간',
+                    protocol: 'NGSI-LD',
+                    lastSync: new Date().toISOString(),
+                    objects: 0,
+                    progress: 100,
+                },
+                {
+                    name: '메타데이터 동기화',
+                    id: 'sync-metadata',
+                    status: 'active',
+                    type: '주기적',
+                    protocol: 'REST API',
+                    lastSync: new Date(Date.now() - 300000).toISOString(),
+                    objects: 0,
+                    progress: 100,
+                },
+                {
+                    name: '이벤트 스트림 동기화',
+                    id: 'sync-events',
+                    status: 'active',
+                    type: '실시간',
+                    protocol: 'Kafka',
+                    lastSync: new Date(Date.now() - 60000).toISOString(),
+                    objects: 0,
+                    progress: 100,
+                },
+                {
+                    name: '컨텍스트 데이터 동기화',
+                    id: 'sync-context',
+                    status: 'inactive',
+                    type: '수동',
+                    protocol: 'JSON-LD',
+                    lastSync: null,
+                    objects: 0,
+                    progress: 0,
+                },
+            ];
+
+            const grid = document.getElementById('syncGrid');
+            grid.innerHTML = engines.map(e => `
+        <div class="sync-card">
+          <div class="sync-card-header">
+            <div>
+              <div class="sync-card-title">
+                ${e.status === 'active' ? '🟢' : e.status === 'syncing' ? '🟡' : '⚪'} ${e.name}
+              </div>
+              <div class="sync-card-id">${e.id}</div>
+            </div>
+            <span class="status-dot ${e.status}">${e.status === 'active' ? '활성' : e.status === 'syncing' ? '동기화 중' : '비활성'}</span>
+          </div>
+          <div class="sync-card-body">
+            <div class="sync-field">
+              <div class="sync-field-label">동기화 유형</div>
+              <div class="sync-field-value">${e.type}</div>
+            </div>
+            <div class="sync-field">
+              <div class="sync-field-label">프로토콜</div>
+              <div class="sync-field-value">${e.protocol}</div>
+            </div>
+            <div class="sync-field">
+              <div class="sync-field-label">동기화 객체</div>
+              <div class="sync-field-value">${e.objects}개</div>
+            </div>
+            <div class="sync-field">
+              <div class="sync-field-label">마지막 동기화</div>
+              <div class="sync-field-value">${e.lastSync ? formatDate(e.lastSync) : '-'}</div>
+            </div>
+          </div>
+          <div class="sync-card-footer">
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);">
+                <span>진행률</span>
+                <span>${e.progress}%</span>
+              </div>
+              <div class="progress-bar-wrapper">
+                <div class="progress-bar-fill" style="width:${e.progress}%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+        }
+
+        // ── Init ──
+        loadServiceInfo();
+    </script>
+</body>
+
+</html>

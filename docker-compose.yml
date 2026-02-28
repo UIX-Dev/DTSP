@@ -8,15 +8,15 @@ services:
       - NDXPRO_ENV_TOKEN=eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyMSIsImF1dGgiOiJBRE1JTiIsImV4cCI6MjAwMDE2MzQ2NH0.9Ed_V3BRvA9ASU8tcFxS7Wrx16ACYV5Chn3MHb_6TUlIhTW8uPNG2d6ocNCyIBp4DNU84VqxCatLnzJc0_7cCA
       - NDXPRO_ENV_API_URL=http://localhost:54002
       - NDXPRO_ENV_API_OUTSIDE_URL=http://localhost:54002
-      - NDXPRO_ENV_DIGITAL_TWIN_SEARCH_URL=http://localhost:54008/meta/exsearch/list
+      - NDXPRO_ENV_DIGITAL_TWIN_SEARCH_URL=http://localhost:8084/meta/exsearch/list
       - NDXPRO_ENV_VIEWER_URL=http://localhost:50038
-      - NDXPRO_ENV_PREDICTOR_TOOL_URL=http://localhost:54002
-      - NDXPRO_ENV_DISCRETE_SIMULATOR_URL=http://localhost:54002
+      - NDXPRO_ENV_PREDICTOR_TOOL_URL=http://localhost:8084/predictor
+      - NDXPRO_ENV_DISCRETE_SIMULATOR_URL=http://localhost:8084/discrete-simulator
       - NDXPRO_ENV_SERVICE_LOGIC_TOOL_URL=http://bigsoft.iptime.org:9900/keti
-      - NDXPRO_ENV_DIGITAL_TWIN_METADATA_REGISTRATION=http://localhost:54008/loginpass?to=/meta/exmanage/dt
-      - NDXPRO_ENV_METADATA_VISUALIZATION_GRAPH=http://localhost:54008/loginpass?to=/meta/exmedatagraph
-      - NDXPRO_ENV_UNION_OBJECT_SYNC_ENGINE_MANAGEMENT=http://localhost:50038
-      - NDXPRO_ENV_VERIFICATION_DATA_ADDITION_MANAGEMENT=http://localhost:54009
+      - NDXPRO_ENV_DIGITAL_TWIN_METADATA_REGISTRATION=http://localhost:8084/loginpass?to=/meta/exmanage/dt
+      - NDXPRO_ENV_METADATA_VISUALIZATION_GRAPH=http://localhost:8084/loginpass?to=/meta/exmedatagraph
+      - NDXPRO_ENV_UNION_OBJECT_SYNC_ENGINE_MANAGEMENT=http://localhost:8084/sync-engine
+      - NDXPRO_ENV_VERIFICATION_DATA_ADDITION_MANAGEMENT=http://localhost:8084/verification
     ports:
       - '50031:80'
 

@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>디지털 트윈 메타데이터 등록</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="page-header">
+        <div>
+            <h1><span class="icon">📝</span> 디지털 트윈 메타데이터 관리</h1>
+            <div class="subtitle">Digital Twin Metadata Registration &amp; Management</div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="tabBar">
+        <button class="tab active" data-tab="models" onclick="switchTab('models')">📦 데이터 모델</button>
+        <button class="tab" data-tab="attributes" onclick="switchTab('attributes')">🏷️ 속성</button>
+        <button class="tab" data-tab="contexts" onclick="switchTab('contexts')">🔗 컨텍스트</button>
+    </div>
+
+    <div class="container">
+        <!-- ===================== DATA MODELS TAB ===================== -->
+        <div id="tab-models" class="tab-content">
+            <div class="toolbar">
+                <div class="search-box">
+                    <input type="text" id="modelSearch" placeholder="모델 검색..."
+                        onkeydown="if(event.key==='Enter'){currentModelPage=0;loadModels()}" />
+                </div>
+                <button class="btn btn-primary" onclick="currentModelPage=0;loadModels()">🔍 검색</button>
+                <div style="flex:1"></div>
+                <button class="btn btn-success" onclick="openCreateModelModal()">＋ 새 데이터 모델</button>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>모델 ID</th>
+                                <th>타입</th>
+                                <th>버전</th>
+                                <th>제목</th>
+                                <th>상태</th>
+                                <th>생성일</th>
+                                <th style="width:140px">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modelsBody">
+                            <tr>
+                                <td colspan="8">
+                                    <div class="loading">
+                                        <div class="spinner"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <div class="pagination-info" id="modelsPagInfo">-</div>
+                    <div class="pagination-controls" id="modelsPagCtrl"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===================== ATTRIBUTES TAB ===================== -->
+        <div id="tab-attributes" class="tab-content" style="display:none">
+            <div class="toolbar">
+                <div class="search-box">
+                    <input type="text" id="attrSearch" placeholder="속성 검색..."
+                        onkeydown="if(event.key==='Enter'){currentAttrPage=0;loadAttributes()}" />
+                </div>
+                <button class="btn btn-primary" onclick="currentAttrPage=0;loadAttributes()">🔍 검색</button>
+                <div style="flex:1"></div>
+                <button class="btn btn-success" onclick="openCreateAttrModal()">＋ 새 속성</button>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>속성 ID</th>
+                                <th>제목</th>
+                                <th>속성 타입</th>
+                                <th>값 타입</th>
+                                <th>타입</th>
+                                <th>생성일</th>
+                                <th style="width:140px">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attrsBody">
+                            <tr>
+                                <td colspan="8">
+                                    <div class="loading">
+                                        <div class="spinner"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <div class="pagination-info" id="attrsPagInfo">-</div>
+                    <div class="pagination-controls" id="attrsPagCtrl"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===================== CONTEXTS TAB ===================== -->
+        <div id="tab-contexts" class="tab-content" style="display:none">
+            <div class="toolbar">
+                <div style="flex:1;font-size:14px;color:var(--text-secondary)">등록된 JSON-LD 컨텍스트 목록</div>
+                <button class="btn btn-success" onclick="openCreateContextModal()">＋ 컨텍스트 추가</button>
+            </div>
+            <div class="card">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>컨텍스트 URL</th>
+                                <th style="width:120px">작업</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contextsBody">
+                            <tr>
+                                <td colspan="3">
+                                    <div class="loading">
+                                        <div class="spinner"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== MODALS ===================== -->
+
+    <!-- Create/Edit Data Model Modal -->
+    <div class="modal-overlay" id="modelModal">
+        <div class="modal" style="max-width:750px">
+            <div class="modal-header">
+                <h3 id="modelModalTitle">데이터 모델 생성</h3>
+                <button class="modal-close" onclick="closeModal('modelModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>모델 ID *</label>
+                        <input type="text" id="mf_id" placeholder="예: WeatherObserved" />
+                    </div>
+                    <div class="form-group">
+                        <label>타입</label>
+                        <input type="text" id="mf_type" value="DigitalTwin" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>제목</label>
+                        <input type="text" id="mf_title" placeholder="모델 이름" />
+                    </div>
+                    <div class="form-group">
+                        <label>버전</label>
+                        <input type="text" id="mf_version" value="1.0" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>설명</label>
+                    <textarea id="mf_description" placeholder="모델에 대한 설명"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>속성 (JSON 형식)</label>
+                    <textarea id="mf_attributes" style="min-height:120px;font-family:monospace;font-size:13px"
+                        placeholder='예: { "temperature": { "type": "Property", "value": { "type": "Double" } } }'></textarea>
+                </div>
+                <div class="form-group">
+                    <label>필수 속성 (쉼표로 구분)</label>
+                    <input type="text" id="mf_required" placeholder="예: temperature,humidity" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('modelModal')">취소</button>
+                <button class="btn btn-primary" id="modelSubmitBtn" onclick="submitModel()">생성</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Attribute Modal -->
+    <div class="modal-overlay" id="attrModal">
+        <div class="modal" style="max-width:600px">
+            <div class="modal-header">
+                <h3 id="attrModalTitle">속성 생성</h3>
+                <button class="modal-close" onclick="closeModal('attrModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>속성 ID *</label>
+                        <input type="text" id="af_id" placeholder="예: temperature" />
+                    </div>
+                    <div class="form-group">
+                        <label>제목</label>
+                        <input type="text" id="af_title" placeholder="속성 이름" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>설명</label>
+                    <textarea id="af_description" placeholder="속성에 대한 설명"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>속성 타입</label>
+                        <select id="af_attributeType">
+                            <option value="Property">Property</option>
+                            <option value="Relationship">Relationship</option>
+                            <option value="GeoProperty">GeoProperty</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>값 타입</label>
+                        <select id="af_valueType">
+                            <option value="String">String</option>
+                            <option value="Integer">Integer</option>
+                            <option value="Double">Double</option>
+                            <option value="Boolean">Boolean</option>
+                            <option value="Object">Object</option>
+                            <option value="ArrayObject">ArrayObject</option>
+                            <option value="ArrayString">ArrayString</option>
+                            <option value="ArrayDouble">ArrayDouble</option>
+                            <option value="ArrayInteger">ArrayInteger</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('attrModal')">취소</button>
+                <button class="btn btn-primary" id="attrSubmitBtn" onclick="submitAttribute()">생성</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Context Modal -->
+    <div class="modal-overlay" id="ctxModal">
+        <div class="modal" style="max-width:600px">
+            <div class="modal-header">
+                <h3>컨텍스트 임포트</h3>
+                <button class="modal-close" onclick="closeModal('ctxModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>컨텍스트 URL</label>
+                    <input type="text" id="cf_url"
+                        placeholder="https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('ctxModal')">취소</button>
+                <button class="btn btn-primary" onclick="submitContext()">임포트</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal" style="max-width:800px">
+            <div class="modal-header">
+                <h3 id="detailModalTitle">상세 정보</h3>
+                <button class="modal-close" onclick="closeModal('detailModal')">✕</button>
+            </div>
+            <div class="modal-body" id="detailModalBody">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('detailModal')">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal" style="max-width:420px">
+            <div class="modal-header">
+                <h3>⚠️ 삭제 확인</h3>
+                <button class="modal-close" onclick="closeModal('deleteModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteMsg" style="text-align:center;font-size:15px;padding:12px 0">정말 삭제하시겠습니까?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('deleteModal')">취소</button>
+                <button class="btn btn-danger" id="deleteConfirmBtn">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script>
+        // ===== TAB SWITCHING =====
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).style.display = 'block';
+            document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+            if (tab === 'models') loadModels();
+            else if (tab === 'attributes') loadAttributes();
+            else if (tab === 'contexts') loadContexts();
+        }
+
+        // ===== DATA MODELS =====
+        let currentModelPage = 0;
+        let editingModel = null;
+
+        async function loadModels() {
+            const word = document.getElementById('modelSearch').value.trim();
+            const tbody = document.getElementById('modelsBody');
+            tbody.innerHTML = '<tr><td colspan="8"><div class="loading"><div class="spinner"></div></div></td></tr>';
+
+            try {
+                const result = await api.getDataModels({ curPage: currentModelPage, size: 25, word });
+                const items = result.data || [];
+                const total = result.totalData || 0;
+
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">📭</div><h3>데이터 모델이 없습니다</h3><p>"새 데이터 모델" 버튼을 클릭하여 생성하세요.</p></div></td></tr>';
+                    document.getElementById('modelsPagInfo').textContent = '0개';
+                    document.getElementById('modelsPagCtrl').innerHTML = '';
+                    return;
+                }
+
+                const details = await Promise.allSettled(items.map(id => api.getDataModel(id)));
+
+                tbody.innerHTML = details.map((d, i) => {
+                    if (d.status === 'rejected') {
+                        return `<tr><td>${currentModelPage * 25 + i + 1}</td><td><strong>${items[i]}</strong></td><td colspan="6">로드 실패</td></tr>`;
+                    }
+                    const m = d.value;
+                    return `<tr>
+            <td>${currentModelPage * 25 + i + 1}</td>
+            <td><strong>${m.id}</strong></td>
+            <td>${m.type || '-'}</td>
+            <td><span class="badge badge-neutral">${m.version || '-'}</span></td>
+            <td>${truncate(m.title, 25)}</td>
+            <td>${m.isReady ? '<span class="badge badge-success">준비 완료</span>' : '<span class="badge badge-warning">준비 중</span>'}</td>
+            <td style="font-size:13px;color:var(--text-secondary)">${formatDate(m.createdAt)}</td>
+            <td class="td-actions">
+              <button class="btn btn-sm btn-secondary" onclick="showModelDetail('${m.id}')">보기</button>
+              <button class="btn btn-sm btn-danger" onclick="confirmDeleteModel('${m.id}')">삭제</button>
+            </td>
+          </tr>`;
+                }).join('');
+
+                document.getElementById('modelsPagInfo').textContent = `${total}개 중 ${items.length}개`;
+                renderModelPagination(result.totalPage || 0);
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">⚠️</div><h3>오류</h3><p>${err.message}</p></div></td></tr>`;
+            }
+        }
+
+        function renderModelPagination(totalPages) {
+            const ctrl = document.getElementById('modelsPagCtrl');
+            if (totalPages <= 1) { ctrl.innerHTML = ''; return; }
+            let html = `<button ${currentModelPage === 0 ? 'disabled' : ''} onclick="currentModelPage--;loadModels()">◀</button>`;
+            for (let i = Math.max(0, currentModelPage - 2); i <= Math.min(totalPages - 1, currentModelPage + 2); i++) {
+                html += `<button class="${i === currentModelPage ? 'active' : ''}" onclick="currentModelPage=${i};loadModels()">${i + 1}</button>`;
+            }
+            html += `<button ${currentModelPage >= totalPages - 1 ? 'disabled' : ''} onclick="currentModelPage++;loadModels()">▶</button>`;
+            ctrl.innerHTML = html;
+        }
+
+        function openCreateModelModal() {
+            editingModel = null;
+            document.getElementById('modelModalTitle').textContent = '📦 새 데이터 모델 생성';
+            document.getElementById('modelSubmitBtn').textContent = '생성';
+            ['mf_id', 'mf_title', 'mf_description', 'mf_attributes', 'mf_required'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('mf_type').value = 'DigitalTwin';
+            document.getElementById('mf_version').value = '1.0';
+            document.getElementById('mf_id').disabled = false;
+            openModal('modelModal');
+        }
+
+        async function submitModel() {
+            const id = document.getElementById('mf_id').value.trim();
+            if (!id) return showToast('모델 ID를 입력하세요.', 'error');
+
+            let attrs = {};
+            const attrsRaw = document.getElementById('mf_attributes').value.trim();
+            if (attrsRaw) {
+                try { attrs = JSON.parse(attrsRaw); }
+                catch (e) { return showToast('속성 JSON 형식이 올바르지 않습니다.', 'error'); }
+            }
+
+            const reqStr = document.getElementById('mf_required').value.trim();
+            const required = reqStr ? reqStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+            const data = {
+                id,
+                type: document.getElementById('mf_type').value,
+                title: document.getElementById('mf_title').value,
+                version: document.getElementById('mf_version').value,
+                description: document.getElementById('mf_description').value,
+                attributes: attrs,
+                required,
+            };
+
+            try {
+                if (editingModel) {
+                    await api.updateDataModel(data);
+                    showToast('데이터 모델이 수정되었습니다.', 'success');
+                } else {
+                    await api.createDataModel(data);
+                    showToast('데이터 모델이 생성되었습니다.', 'success');
+                }
+                closeModal('modelModal');
+                loadModels();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function showModelDetail(id) {
+            openModal('detailModal');
+            document.getElementById('detailModalTitle').textContent = `📦 ${id}`;
+            document.getElementById('detailModalBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            try {
+                const m = await api.getDataModel(id);
+                document.getElementById('detailModalBody').innerHTML = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+            <div class="form-group"><label>모델 ID</label><div style="padding:6px 0;font-weight:600">${m.id}</div></div>
+            <div class="form-group"><label>타입</label><div style="padding:6px 0">${m.type || '-'}</div></div>
+            <div class="form-group"><label>버전</label><div style="padding:6px 0">${m.version || '-'}</div></div>
+            <div class="form-group"><label>상태</label><div style="padding:6px 0">${m.isReady ? '<span class="badge badge-success">준비 완료</span>' : '<span class="badge badge-warning">준비 중</span>'}</div></div>
+            <div class="form-group"><label>제목</label><div style="padding:6px 0">${m.title || '-'}</div></div>
+            <div class="form-group"><label>동적 여부</label><div style="padding:6px 0">${m.isDynamic ? '예' : '아니오'}</div></div>
+            <div class="form-group" style="grid-column:span 2"><label>설명</label><div style="padding:6px 0">${m.description || '-'}</div></div>
+            <div class="form-group"><label>생성일</label><div style="padding:6px 0;font-size:13px">${formatDate(m.createdAt)}</div></div>
+            <div class="form-group"><label>수정일</label><div style="padding:6px 0;font-size:13px">${formatDate(m.modifiedAt)}</div></div>
+          </div>
+          ${m.attributes ? `<div class="form-group"><label>속성 데이터 (JSON)</label><div class="json-viewer">${JSON.stringify(m.attributes, null, 2)}</div></div>` : ''}
+        `;
+            } catch (err) {
+                document.getElementById('detailModalBody').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><h3>로드 실패</h3><p>${err.message}</p></div>`;
+            }
+        }
+
+        function confirmDeleteModel(id) {
+            document.getElementById('deleteMsg').textContent = `"${id}" 데이터 모델을 삭제하시겠습니까?`;
+            document.getElementById('deleteConfirmBtn').onclick = async () => {
+                try {
+                    await api.deleteDataModel(id);
+                    showToast('삭제되었습니다.', 'success');
+                    closeModal('deleteModal');
+                    loadModels();
+                } catch (err) { showToast(err.message, 'error'); }
+            };
+            openModal('deleteModal');
+        }
+
+        // ===== ATTRIBUTES =====
+        let currentAttrPage = 0;
+
+        async function loadAttributes() {
+            const word = document.getElementById('attrSearch').value.trim();
+            const tbody = document.getElementById('attrsBody');
+            tbody.innerHTML = '<tr><td colspan="8"><div class="loading"><div class="spinner"></div></div></td></tr>';
+
+            try {
+                const result = await api.getAttributes({ curPage: currentAttrPage, size: 25, word });
+                const items = result.data || [];
+                const total = result.totalData || 0;
+
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">📭</div><h3>속성이 없습니다</h3><p>"새 속성" 버튼을 클릭하여 생성하세요.</p></div></td></tr>';
+                    document.getElementById('attrsPagInfo').textContent = '0개';
+                    document.getElementById('attrsPagCtrl').innerHTML = '';
+                    return;
+                }
+
+                const details = await Promise.allSettled(items.map(item => {
+                    const id = typeof item === 'string' ? item : item.id;
+                    return api.getAttribute(id);
+                }));
+
+                tbody.innerHTML = details.map((d, i) => {
+                    const attrId = typeof items[i] === 'string' ? items[i] : items[i].id;
+                    if (d.status === 'rejected') {
+                        return `<tr><td>${currentAttrPage * 25 + i + 1}</td><td><strong>${attrId}</strong></td><td colspan="6">로드 실패</td></tr>`;
+                    }
+                    const a = d.value;
+                    return `<tr>
+            <td>${currentAttrPage * 25 + i + 1}</td>
+            <td><strong>${a.id || attrId}</strong></td>
+            <td>${a.title || '-'}</td>
+            <td><span class="badge badge-info">${a.attributeType || '-'}</span></td>
+            <td>${a.valueType || '-'}</td>
+            <td><span class="badge badge-neutral">${a.type || '-'}</span></td>
+            <td style="font-size:13px;color:var(--text-secondary)">${formatDate(a.createdAt)}</td>
+            <td class="td-actions">
+              <button class="btn btn-sm btn-secondary" onclick='showAttrDetail(${JSON.stringify(a).replace(/'/g, "\\'")})'">보기</button>
+              <button class="btn btn-sm btn-danger" onclick="confirmDeleteAttr('${a.id || attrId}')">삭제</button>
+            </td>
+          </tr>`;
+                }).join('');
+
+                document.getElementById('attrsPagInfo').textContent = `${total}개 중 ${items.length}개`;
+                renderAttrPagination(result.totalPage || 0);
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">⚠️</div><h3>오류</h3><p>${err.message}</p></div></td></tr>`;
+            }
+        }
+
+        function renderAttrPagination(totalPages) {
+            const ctrl = document.getElementById('attrsPagCtrl');
+            if (totalPages <= 1) { ctrl.innerHTML = ''; return; }
+            let html = `<button ${currentAttrPage === 0 ? 'disabled' : ''} onclick="currentAttrPage--;loadAttributes()">◀</button>`;
+            for (let i = Math.max(0, currentAttrPage - 2); i <= Math.min(totalPages - 1, currentAttrPage + 2); i++) {
+                html += `<button class="${i === currentAttrPage ? 'active' : ''}" onclick="currentAttrPage=${i};loadAttributes()">${i + 1}</button>`;
+            }
+            html += `<button ${currentAttrPage >= totalPages - 1 ? 'disabled' : ''} onclick="currentAttrPage++;loadAttributes()">▶</button>`;
+            ctrl.innerHTML = html;
+        }
+
+        function openCreateAttrModal() {
+            document.getElementById('attrModalTitle').textContent = '🏷️ 새 속성 생성';
+            document.getElementById('attrSubmitBtn').textContent = '생성';
+            ['af_id', 'af_title', 'af_description'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('af_id').disabled = false;
+            openModal('attrModal');
+        }
+
+        async function submitAttribute() {
+            const id = document.getElementById('af_id').value.trim();
+            if (!id) return showToast('속성 ID를 입력하세요.', 'error');
+
+            const data = {
+                id,
+                title: document.getElementById('af_title').value,
+                description: document.getElementById('af_description').value,
+                attributeType: document.getElementById('af_attributeType').value,
+                valueType: document.getElementById('af_valueType').value,
+            };
+
+            try {
+                await api.createAttribute(data);
+                showToast('속성이 생성되었습니다.', 'success');
+                closeModal('attrModal');
+                loadAttributes();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function showAttrDetail(attr) {
+            openModal('detailModal');
+            document.getElementById('detailModalTitle').textContent = `🏷️ ${attr.id}`;
+            document.getElementById('detailModalBody').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="form-group"><label>속성 ID</label><div style="padding:6px 0;font-weight:600">${attr.id}</div></div>
+          <div class="form-group"><label>제목</label><div style="padding:6px 0">${attr.title || '-'}</div></div>
+          <div class="form-group"><label>속성 타입</label><div style="padding:6px 0"><span class="badge badge-info">${attr.attributeType || '-'}</span></div></div>
+          <div class="form-group"><label>값 타입</label><div style="padding:6px 0">${attr.valueType || '-'}</div></div>
+          <div class="form-group"><label>타입</label><div style="padding:6px 0">${attr.type || '-'}</div></div>
+          <div class="form-group"><label>포맷</label><div style="padding:6px 0">${attr.format || '-'}</div></div>
+          <div class="form-group" style="grid-column:span 2"><label>설명</label><div style="padding:6px 0">${attr.description || '-'}</div></div>
+          <div class="form-group"><label>생성일</label><div style="padding:6px 0;font-size:13px">${formatDate(attr.createdAt)}</div></div>
+          <div class="form-group"><label>수정일</label><div style="padding:6px 0;font-size:13px">${formatDate(attr.modifiedAt)}</div></div>
+        </div>
+      `;
+        }
+
+        function confirmDeleteAttr(id) {
+            document.getElementById('deleteMsg').textContent = `"${id}" 속성을 삭제하시겠습니까?`;
+            document.getElementById('deleteConfirmBtn').onclick = async () => {
+                try {
+                    await api.deleteAttribute(id);
+                    showToast('삭제되었습니다.', 'success');
+                    closeModal('deleteModal');
+                    loadAttributes();
+                } catch (err) { showToast(err.message, 'error'); }
+            };
+            openModal('deleteModal');
+        }
+
+        // ===== CONTEXTS =====
+        async function loadContexts() {
+            const tbody = document.getElementById('contextsBody');
+            tbody.innerHTML = '<tr><td colspan="3"><div class="loading"><div class="spinner"></div></div></td></tr>';
+
+            try {
+                const contexts = await api.getContexts();
+
+                if (!contexts || contexts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3"><div class="empty-state"><div class="icon">📭</div><h3>컨텍스트가 없습니다</h3><p>"컨텍스트 추가" 버튼으로 JSON-LD 컨텍스트를 임포트하세요.</p></div></td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = contexts.map((url, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>
+              <strong style="word-break:break-all">${url}</strong>
+            </td>
+            <td class="td-actions">
+              <button class="btn btn-sm btn-secondary" onclick="showContextDetail('${url}')">보기</button>
+              <button class="btn btn-sm btn-danger" onclick="confirmDeleteContext('${url}')">삭제</button>
+            </td>
+          </tr>
+        `).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state"><div class="icon">⚠️</div><h3>오류</h3><p>${err.message}</p></div></td></tr>`;
+            }
+        }
+
+        function openCreateContextModal() {
+            document.getElementById('cf_url').value = '';
+            openModal('ctxModal');
+        }
+
+        async function submitContext() {
+            const url = document.getElementById('cf_url').value.trim();
+            if (!url) return showToast('URL을 입력하세요.', 'error');
+
+            try {
+                // Use import endpoint
+                const res = await fetch(`/api/manager/contexts/import?contextUrl=${encodeURIComponent(url)}`, { method: 'POST' });
+                if (!res.ok) throw new Error(`임포트 실패: ${res.status}`);
+                showToast('컨텍스트가 임포트되었습니다.', 'success');
+                closeModal('ctxModal');
+                loadContexts();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        async function showContextDetail(url) {
+            openModal('detailModal');
+            document.getElementById('detailModalTitle').textContent = '🔗 컨텍스트 상세';
+            document.getElementById('detailModalBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+            try {
+                const ctx = await api.getContext(url);
+                document.getElementById('detailModalBody').innerHTML = `
+          <div class="form-group"><label>URL</label><div style="padding:6px 0;word-break:break-all;font-weight:500">${ctx.url || url}</div></div>
+          <div class="form-group"><label>데이터</label><div class="json-viewer">${JSON.stringify(ctx, null, 2)}</div></div>
+        `;
+            } catch (err) {
+                document.getElementById('detailModalBody').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><h3>로드 실패</h3><p>${err.message}</p></div>`;
+            }
+        }
+
+        function confirmDeleteContext(url) {
+            document.getElementById('deleteMsg').textContent = `이 컨텍스트를 삭제하시겠습니까?`;
+            document.getElementById('deleteConfirmBtn').onclick = async () => {
+                try {
+                    await api.deleteContext(url);
+                    showToast('삭제되었습니다.', 'success');
+                    closeModal('deleteModal');
+                    loadContexts();
+                } catch (err) { showToast(err.message, 'error'); }
+            };
+            openModal('deleteModal');
+        }
+
+        // ===== INIT =====
+        loadModels();
+    </script>
+</body>
+
+</html>

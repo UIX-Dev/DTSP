@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이산 연속 시뮬레이션 조합 도구</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a237e, #3949ab);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 13px;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .status-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #69f0ae;
+        }
+
+        .status-dot.offline {
+            background: #ff5252;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 16px;
+            padding: 20px 30px;
+        }
+
+        .stat-card {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a237e;
+        }
+
+        .stat-card .label {
+            font-size: 13px;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        .main {
+            padding: 0 30px 30px;
+        }
+
+        .section-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #f0f0f0;
+            padding: 0 24px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: #1a237e;
+            border-bottom-color: #1a237e;
+            font-weight: 600;
+        }
+
+        .tab:hover {
+            color: #1a237e;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 24px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Simulation List */
+        .sim-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sim-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            transition: all 0.2s;
+            gap: 16px;
+        }
+
+        .sim-item:hover {
+            border-color: #3949ab;
+            box-shadow: 0 2px 8px rgba(26, 35, 126, 0.1);
+        }
+
+        .sim-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .sim-icon.discrete {
+            background: #e8eaf6;
+        }
+
+        .sim-icon.continuous {
+            background: #e3f2fd;
+        }
+
+        .sim-icon.hybrid {
+            background: #f3e5f5;
+        }
+
+        .sim-info {
+            flex: 1;
+        }
+
+        .sim-info .name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #333;
+        }
+
+        .sim-info .desc {
+            font-size: 13px;
+            color: #888;
+            margin-top: 3px;
+        }
+
+        .sim-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .sim-status.running {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .sim-status.stopped {
+            background: #fafafa;
+            color: #999;
+        }
+
+        .sim-status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        /* Simulation Types */
+        .sim-types {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .sim-type-card {
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sim-type-card:hover {
+            border-color: #3949ab;
+            box-shadow: 0 4px 12px rgba(26, 35, 126, 0.1);
+        }
+
+        .sim-type-card.selected {
+            border-color: #1a237e;
+            background: #e8eaf6;
+        }
+
+        .sim-type-card .type-icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        .sim-type-card .type-name {
+            font-weight: 600;
+            font-size: 15px;
+            color: #333;
+        }
+
+        .sim-type-card .type-desc {
+            font-size: 12px;
+            color: #888;
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        /* Form */
+        .form-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .form-group {
+            flex: 1;
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3949ab;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #1a237e, #3949ab);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Workflow Diagram */
+        .workflow-container {
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .workflow-steps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .workflow-step {
+            background: white;
+            border: 2px solid #e8eaf6;
+            border-radius: 12px;
+            padding: 16px 20px;
+            min-width: 140px;
+            text-align: center;
+        }
+
+        .workflow-step .step-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .workflow-step .step-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .workflow-step .step-desc {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .workflow-arrow {
+            font-size: 24px;
+            color: #3949ab;
+        }
+
+        /* Connection info */
+        .connection-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+
+        .connection-card {
+            border: 1px solid #e8e8e8;
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .connection-card .conn-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .connection-card .conn-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            word-break: break-all;
+        }
+
+        .connection-card .conn-status {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .conn-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .conn-dot.ok {
+            background: #4caf50;
+        }
+
+        .conn-dot.fail {
+            background: #f44336;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state .empty-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .empty-state .empty-desc {
+            font-size: 13px;
+            margin-top: 8px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div>
+            <h1>🔀 이산 연속 시뮬레이션 조합 도구</h1>
+            <p>Discrete-Continuous Simulation Merge Tool</p>
+        </div>
+        <div class="header-right">
+            <div class="status-badge" id="serviceBadge">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">확인 중...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="value" id="totalSims">0</div>
+            <div class="label">전체 시뮬레이션</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="discreteSims">0</div>
+            <div class="label">이산 시뮬레이션</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="continuousSims">0</div>
+            <div class="label">연속 시뮬레이션</div>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="mergedSims">0</div>
+            <div class="label">조합 시뮬레이션</div>
+        </div>
+    </div>
+
+    <div class="main">
+        <!-- Workflow Diagram -->
+        <div class="section-card" style="margin-bottom: 20px;">
+            <div style="padding: 16px 24px; border-bottom: 1px solid #f0f0f0;">
+                <h2 style="font-size: 16px;">시뮬레이션 조합 워크플로우</h2>
+            </div>
+            <div class="workflow-container">
+                <div class="workflow-steps">
+                    <div class="workflow-step">
+                        <div class="step-icon">📊</div>
+                        <div class="step-name">데이터 수집</div>
+                        <div class="step-desc">엔터티 데이터 로드</div>
+                    </div>
+                    <div class="workflow-arrow">→</div>
+                    <div class="workflow-step">
+                        <div class="step-icon">🎲</div>
+                        <div class="step-name">이산 시뮬레이션</div>
+                        <div class="step-desc">이벤트 기반 모델링</div>
+                    </div>
+                    <div class="workflow-arrow">→</div>
+                    <div class="workflow-step">
+                        <div class="step-icon">📈</div>
+                        <div class="step-name">연속 시뮬레이션</div>
+                        <div class="step-desc">미분방정식 기반</div>
+                    </div>
+                    <div class="workflow-arrow">→</div>
+                    <div class="workflow-step">
+                        <div class="step-icon">🔀</div>
+                        <div class="step-name">조합 병합</div>
+                        <div class="step-desc">결과 통합 분석</div>
+                    </div>
+                    <div class="workflow-arrow">→</div>
+                    <div class="workflow-step">
+                        <div class="step-icon">📋</div>
+                        <div class="step-name">결과 출력</div>
+                        <div class="step-desc">시뮬레이션 리포트</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="tabs">
+                <div class="tab active" data-tab="simulations">시뮬레이션 목록</div>
+                <div class="tab" data-tab="create">새 시뮬레이션 생성</div>
+                <div class="tab" data-tab="connection">연결 설정</div>
+            </div>
+
+            <!-- Tab 1: Simulation List -->
+            <div class="tab-content active" id="tab-simulations">
+                <div id="simListContainer">
+                    <div class="empty-state">
+                        <div class="empty-icon">🔀</div>
+                        <div class="empty-title">시뮬레이션이 없습니다</div>
+                        <div class="empty-desc">
+                            "새 시뮬레이션 생성" 탭에서 이산-연속 시뮬레이션 조합을 시작하세요.<br>
+                            이산 시뮬레이션과 연속 시뮬레이션을 병합하여<br>
+                            하이브리드 분석 결과를 확인할 수 있습니다.
+                        </div>
+                        <button class="btn btn-primary" style="margin-top: 16px;"
+                            onclick="document.querySelectorAll('.tab')[1].click()">
+                            + 새 시뮬레이션 생성
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Create New Simulation -->
+            <div class="tab-content" id="tab-create">
+                <h3 style="margin-bottom: 20px; font-size: 16px;">시뮬레이션 유형 선택</h3>
+                <div class="sim-types" id="simTypeSelector">
+                    <div class="sim-type-card" data-type="discrete" onclick="selectSimType(this)">
+                        <div class="type-icon">🎲</div>
+                        <div class="type-name">이산 시뮬레이션</div>
+                        <div class="type-desc">이벤트 기반으로 상태 변화를<br>모델링합니다 (DEVS, Petri Net)</div>
+                    </div>
+                    <div class="sim-type-card" data-type="continuous" onclick="selectSimType(this)">
+                        <div class="type-icon">📈</div>
+                        <div class="type-name">연속 시뮬레이션</div>
+                        <div class="type-desc">미분방정식 기반으로 연속적<br>변화를 모델링합니다 (ODE, PDE)</div>
+                    </div>
+                    <div class="sim-type-card" data-type="hybrid" onclick="selectSimType(this)">
+                        <div class="type-icon">🔀</div>
+                        <div class="type-name">조합 (하이브리드)</div>
+                        <div class="type-desc">이산과 연속 시뮬레이션을<br>병합하여 통합 분석합니다</div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>시뮬레이션 이름 *</label>
+                        <input type="text" id="simName" placeholder="예: 스마트빌딩 에너지 시뮬레이션">
+                    </div>
+                    <div class="form-group">
+                        <label>대상 디지털 트윈</label>
+                        <select id="targetEntity">
+                            <option value="">엔터티 선택...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>시뮬레이션 시간 범위</label>
+                        <select id="timeRange">
+                            <option value="1h">1시간</option>
+                            <option value="6h">6시간</option>
+                            <option value="24h" selected>24시간</option>
+                            <option value="7d">7일</option>
+                            <option value="30d">30일</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>시간 단계 (Step)</label>
+                        <select id="timeStep">
+                            <option value="1s">1초</option>
+                            <option value="10s">10초</option>
+                            <option value="1m" selected>1분</option>
+                            <option value="5m">5분</option>
+                            <option value="1h">1시간</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>이산 이벤트 소스</label>
+                        <input type="text" id="discreteSource" placeholder="예: sensor-event-queue">
+                    </div>
+                    <div class="form-group">
+                        <label>연속 모델 방정식</label>
+                        <select id="continuousModel">
+                            <option value="">선택하세요</option>
+                            <option value="ode_linear">선형 ODE</option>
+                            <option value="ode_nonlinear">비선형 ODE</option>
+                            <option value="pde_heat">열전도 PDE</option>
+                            <option value="pde_wave">파동 PDE</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>설명</label>
+                    <textarea id="simDesc" placeholder="시뮬레이션에 대한 설명을 입력하세요..."></textarea>
+                </div>
+
+                <div class="btn-group" style="justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="resetForm()">초기화</button>
+                    <button class="btn btn-primary" onclick="createSimulation()">🔀 시뮬레이션 생성</button>
+                </div>
+            </div>
+
+            <!-- Tab 3: Connection Settings -->
+            <div class="tab-content" id="tab-connection">
+                <div class="connection-grid" id="connectionGrid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GATEWAY_URL = '/api/manager';
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Sim type selection
+        let selectedSimType = null;
+        function selectSimType(el) {
+            document.querySelectorAll('.sim-type-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedSimType = el.dataset.type;
+        }
+
+        // Check connectivity
+        async function checkStatus() {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            try {
+                const resp = await fetch(GATEWAY_URL + '/contexts', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (resp.ok) {
+                    dot.classList.remove('offline');
+                    text.textContent = '연결됨';
+                    // Load entities for dropdown
+                    loadEntities();
+                } else {
+                    dot.classList.add('offline');
+                    text.textContent = '응답 오류';
+                }
+            } catch (e) {
+                dot.classList.add('offline');
+                text.textContent = '연결 실패';
+            }
+        }
+
+        async function loadEntities() {
+            try {
+                const resp = await fetch(GATEWAY_URL + '/contexts', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const select = document.getElementById('targetEntity');
+                    if (Array.isArray(data)) {
+                        data.forEach(ctx => {
+                            const url = typeof ctx === 'string' ? ctx : (ctx.url || ctx.id || JSON.stringify(ctx));
+                            const opt = document.createElement('option');
+                            opt.value = url;
+                            opt.textContent = url.split('/').pop();
+                            select.appendChild(opt);
+                        });
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        // Connection settings
+        async function loadConnections() {
+            const connections = [
+                { label: 'Gateway URL', value: window.location.origin, check: '/api/manager/contexts' },
+                { label: 'Data Manager', value: 'localhost:54008', check: '/api/manager/contexts' },
+                { label: 'Data Service', value: 'localhost:54007', check: null },
+            ];
+
+            const grid = document.getElementById('connectionGrid');
+            grid.innerHTML = connections.map(conn => `
+                <div class="connection-card">
+                    <div class="conn-label">${conn.label}</div>
+                    <div class="conn-value">${conn.value}</div>
+                    <div class="conn-status" id="conn-${conn.label.replace(/\s/g, '')}">
+                        <span class="conn-dot" style="background:#999"></span>
+                        <span>확인 중...</span>
+                    </div>
+                </div>
+            `).join('');
+
+            for (const conn of connections) {
+                const el = document.getElementById('conn-' + conn.label.replace(/\s/g, ''));
+                if (conn.check) {
+                    try {
+                        const resp = await fetch(conn.check, { headers: { 'Accept': 'application/json' } });
+                        el.innerHTML = resp.ok
+                            ? '<span class="conn-dot ok"></span><span style="color:#2e7d32">연결됨</span>'
+                            : `<span class="conn-dot fail"></span><span style="color:#f44336">오류 (${resp.status})</span>`;
+                    } catch (e) {
+                        el.innerHTML = '<span class="conn-dot fail"></span><span style="color:#f44336">연결 실패</span>';
+                    }
+                } else {
+                    el.innerHTML = '<span class="conn-dot" style="background:#999"></span><span style="color:#999">직접 연결 불가</span>';
+                }
+            }
+        }
+
+        function createSimulation() {
+            const name = document.getElementById('simName').value.trim();
+            if (!name) { alert('시뮬레이션 이름을 입력하세요.'); return; }
+            if (!selectedSimType) { alert('시뮬레이션 유형을 선택하세요.'); return; }
+            alert(`시뮬레이션 "${name}" 생성 요청이 전송되었습니다.\n\n참고: 시뮬레이션 서비스가 현재 배포되지 않았습니다. 서비스를 배포한 후 다시 시도하세요.`);
+        }
+
+        function resetForm() {
+            document.getElementById('simName').value = '';
+            document.getElementById('discreteSource').value = '';
+            document.getElementById('simDesc').value = '';
+            document.querySelectorAll('.sim-type-card').forEach(c => c.classList.remove('selected'));
+            selectedSimType = null;
+        }
+
+        // Init
+        checkStatus();
+        loadConnections();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>메타데이터 시각 그래프</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
+    <style>
+        #graphContainer {
+            width: 100%;
+            height: calc(100vh - 160px);
+            min-height: 500px;
+            background: #fafbfe;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-light);
+        }
+
+        .graph-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 24px;
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 16px;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .graph-stats {
+            margin-left: auto;
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .graph-stats span {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .selected-info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 14px 24px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            font-size: 14px;
+            z-index: 10;
+            max-width: 600px;
+            display: none;
+        }
+
+        .selected-info.visible {
+            display: block;
+        }
+
+        .graph-wrapper {
+            position: relative;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="page-header">
+        <div>
+            <h1><span class="icon">🕸️</span> 메타데이터 시각 그래프</h1>
+            <div class="subtitle">Metadata Visualization Graph — Data Model &amp; Attribute Relationships</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Toolbar -->
+        <div class="graph-toolbar">
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background:#4a6cf7"></div> 데이터 모델
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background:#38a169"></div> 속성 (Property)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background:#dd6b20"></div> 속성 (Relationship)
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background:#805ad5"></div> 컨텍스트
+                </div>
+            </div>
+            <div class="graph-stats">
+                모델: <span id="gStatModels">0</span> &nbsp;|&nbsp;
+                속성: <span id="gStatAttrs">0</span> &nbsp;|&nbsp;
+                컨텍스트: <span id="gStatCtx">0</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="resetView()">🔄 초기화</button>
+            <button class="btn btn-primary btn-sm" onclick="loadGraph()">새로고침</button>
+        </div>
+
+        <!-- Graph -->
+        <div class="graph-wrapper">
+            <div id="graphContainer">
+                <div class="loading" style="padding-top:200px">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+            <div class="selected-info" id="selectedInfo"></div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script>
+        let network = null;
+
+        async function loadGraph() {
+            const container = document.getElementById('graphContainer');
+
+            try {
+                // Fetch all data concurrently
+                const [modelsResult, attrsResult, contexts] = await Promise.all([
+                    api.getDataModels({ curPage: 0, size: 100 }),
+                    api.getAttributes({ curPage: 0, size: 200 }),
+                    api.getContexts(),
+                ]);
+
+                const modelIds = modelsResult.data || [];
+                const attrIds = (attrsResult.data || []).map(a => typeof a === 'string' ? a : a.id);
+                const ctxList = contexts || [];
+
+                document.getElementById('gStatModels').textContent = modelIds.length;
+                document.getElementById('gStatAttrs').textContent = attrIds.length;
+                document.getElementById('gStatCtx').textContent = ctxList.length;
+
+                // Fetch model details for graph edges
+                const modelDetails = await Promise.allSettled(
+                    modelIds.map(id => api.getDataModel(id))
+                );
+
+                // Build graph nodes & edges
+                const nodes = [];
+                const edges = [];
+                let nodeId = 0;
+                const attrNodeMap = {};
+
+                // Context nodes
+                ctxList.forEach((url, i) => {
+                    const id = ++nodeId;
+                    nodes.push({
+                        id, label: url.split('/').pop() || url,
+                        shape: 'diamond', color: { background: '#805ad5', border: '#6b46c1', highlight: { background: '#9f7aea', border: '#6b46c1' } },
+                        font: { color: '#553c9a', size: 11 },
+                        title: url,
+                        size: 20,
+                        _type: 'context', _data: url
+                    });
+                });
+
+                // Attribute nodes
+                attrIds.forEach(attrId => {
+                    const id = ++nodeId;
+                    attrNodeMap[attrId] = id;
+                    nodes.push({
+                        id, label: attrId,
+                        shape: 'dot', color: { background: '#38a169', border: '#2f855a', highlight: { background: '#48bb78', border: '#2f855a' } },
+                        font: { color: '#276749', size: 11 },
+                        size: 12,
+                        _type: 'attribute', _data: { id: attrId }
+                    });
+                });
+
+                // Model nodes & edges to attributes
+                modelDetails.forEach((d, i) => {
+                    if (d.status === 'rejected') return;
+                    const m = d.value;
+                    const mNodeId = ++nodeId;
+                    nodes.push({
+                        id: mNodeId, label: m.id,
+                        shape: 'box',
+                        color: { background: '#4a6cf7', border: '#3a56d4', highlight: { background: '#6b8cff', border: '#3a56d4' } },
+                        font: { color: 'white', bold: true, size: 13 },
+                        size: 30,
+                        borderWidth: 2,
+                        shadow: true,
+                        _type: 'model', _data: m
+                    });
+
+                    // Connect to attributes
+                    if (m.attributeNames) {
+                        Object.keys(m.attributeNames).forEach(attrName => {
+                            if (attrNodeMap[attrName]) {
+                                edges.push({
+                                    from: mNodeId, to: attrNodeMap[attrName],
+                                    color: { color: '#a0aec0', highlight: '#4a6cf7', opacity: 0.6 },
+                                    width: 1.5,
+                                    smooth: { type: 'cubicBezier', roundness: 0.4 }
+                                });
+                            } else {
+                                // Create inline attribute node
+                                const aId = ++nodeId;
+                                nodes.push({
+                                    id: aId, label: attrName,
+                                    shape: 'dot', color: { background: '#dd6b20', border: '#c05621', highlight: { background: '#ed8936', border: '#c05621' } },
+                                    font: { color: '#9c4221', size: 10 },
+                                    size: 10,
+                                    _type: 'attribute-inline', _data: { id: attrName, type: m.attributeNames[attrName] }
+                                });
+                                edges.push({
+                                    from: mNodeId, to: aId,
+                                    color: { color: '#cbd5e0', highlight: '#dd6b20', opacity: 0.5 },
+                                    width: 1,
+                                    smooth: { type: 'cubicBezier', roundness: 0.4 }
+                                });
+                            }
+                        });
+                    }
+                });
+
+                // Handle empty graph
+                if (nodes.length === 0) {
+                    container.innerHTML = `
+            <div class="empty-state" style="padding-top:180px">
+              <div class="icon">🕸️</div>
+              <h3>그래프 데이터가 없습니다</h3>
+              <p>데이터 모델과 속성을 등록하면 관계 그래프가 생성됩니다.</p>
+            </div>`;
+                    return;
+                }
+
+                // Render graph
+                const data = {
+                    nodes: new vis.DataSet(nodes),
+                    edges: new vis.DataSet(edges),
+                };
+
+                const options = {
+                    physics: {
+                        solver: 'forceAtlas2Based',
+                        forceAtlas2Based: {
+                            gravitationalConstant: -40,
+                            centralGravity: 0.008,
+                            springLength: 120,
+                            springConstant: 0.04,
+                            damping: 0.5,
+                        },
+                        stabilization: { iterations: 150 },
+                    },
+                    interaction: {
+                        hover: true,
+                        tooltipDelay: 200,
+                        zoomView: true,
+                        dragView: true,
+                    },
+                    layout: {
+                        improvedLayout: true,
+                    },
+                };
+
+                network = new vis.Network(container, data, options);
+
+                // Click handler
+                network.on('click', (params) => {
+                    const infoEl = document.getElementById('selectedInfo');
+                    if (params.nodes.length > 0) {
+                        const node = data.nodes.get(params.nodes[0]);
+                        let html = '';
+                        if (node._type === 'model') {
+                            const m = node._data;
+                            html = `<strong>📦 ${m.id}</strong> — ${m.title || m.type || ''}<br>
+                <span style="color:var(--text-secondary)">버전: ${m.version || '-'} | 상태: ${m.isReady ? '✅ 준비 완료' : '⏳ 준비 중'}</span>`;
+                        } else if (node._type === 'attribute' || node._type === 'attribute-inline') {
+                            html = `<strong>🏷️ ${node._data.id}</strong><br>
+                <span style="color:var(--text-secondary)">타입: ${node._data.type || node._data.attributeType || '-'}</span>`;
+                        } else if (node._type === 'context') {
+                            html = `<strong>🔗 컨텍스트</strong><br>
+                <span style="color:var(--text-secondary);word-break:break-all">${node._data}</span>`;
+                        }
+                        infoEl.innerHTML = html;
+                        infoEl.classList.add('visible');
+                    } else {
+                        infoEl.classList.remove('visible');
+                    }
+                });
+
+            } catch (err) {
+                container.innerHTML = `
+          <div class="empty-state" style="padding-top:180px">
+            <div class="icon">⚠️</div>
+            <h3>그래프 로드 실패</h3>
+            <p>${err.message}</p>
+          </div>`;
+            }
+        }
+
+        function resetView() {
+            if (network) {
+                network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+            }
+            document.getElementById('selectedInfo').classList.remove('visible');
+        }
+
+        // Init
+        loadGraph();
+    </script>
+</body>
+
+</html>

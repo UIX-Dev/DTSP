@@ -102,7 +102,7 @@ export const pages = [
       {
         name: '디지털 트윈 메타데이터 등록',
         homeIcon: DigitalTwinMetaDataIcon,
-        path: '/digital-twin-metadata-registeration',
+        path: '/digital-twin-metadata-registration',
         auth: 'user',
       },
       {

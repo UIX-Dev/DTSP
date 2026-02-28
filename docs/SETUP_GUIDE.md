@@ -77,9 +77,16 @@ docker compose -f docker-compose-kafka.yml up -d
 ```bash
 cd ..
 docker compose -f docker-compose-ndxpro.yml up -d
-docker compose -f docker-compose-file.yml up -d
 docker compose -f docker-compose-fdt.yml up -d
 ```
+
+> ⚠️ **Known Issue — `file-service`**  
+> Image `fdttwin/ndxpro-file-service:v1.0` **không tồn tại trên Docker Hub** (chưa được push hoặc đã bị xóa).  
+> Nếu chạy `docker compose -f docker-compose-file.yml up -d` sẽ bị lỗi:  
+> `pull access denied for fdttwin/ndxpro-file-service, repository does not exist`  
+>  
+> **Workaround:** Bỏ qua `docker-compose-file.yml` — hệ thống core vẫn hoạt động bình thường, chỉ tính năng file upload/download sẽ không khả dụng.  
+> **Để fix hoàn toàn:** Liên hệ e8ight (seong@e8ight.co.kr) yêu cầu push image lên Docker Hub hoặc cung cấp source code/Dockerfile.
 
 Wait ~60s for all services to register with Eureka.  
 Verify at: http://localhost:58761
@@ -108,6 +115,6 @@ docker stop $(docker ps -q)
 ```bash
 cd DTSP/src/DTSP_e8ight/fdt-service-backend/infra && docker compose up -d
 cd ../kafka && docker compose -f docker-compose-zookeeper.yml up -d && sleep 10 && docker compose -f docker-compose-kafka.yml up -d
-cd .. && docker compose -f docker-compose-ndxpro.yml up -d && docker compose -f docker-compose-file.yml up -d && docker compose -f docker-compose-fdt.yml up -d
+cd .. && docker compose -f docker-compose-ndxpro.yml up -d && docker compose -f docker-compose-fdt.yml up -d
 cd ../../.. && docker compose up -d
 ```
